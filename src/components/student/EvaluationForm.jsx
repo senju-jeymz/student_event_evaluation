@@ -15,11 +15,9 @@ import {
   Calendar, 
   MapPin, 
   User, 
-  Award, 
   Printer, 
   AlertCircle,
-  FileCheck2,
-  Sparkles
+  FileCheck2
 } from 'lucide-react';
 
 const STEPS = [
@@ -32,30 +30,31 @@ const STEPS = [
   { id: 7, label: 'Certificate' }
 ];
 
-export default function EvaluationForm({ event, onBackToEvents }) {
-  const { organizations, submitEvaluation } = useEvaluation();
+export default function EvaluationForm({ event, onBackToEvents, editingResponse = null }) {
+  const { organizations, submitEvaluation, updateEvaluation } = useEvaluation();
   const { currentUser } = useAuth();
-  const { encryptSubmission } = useCrypto();
+  const { encryptSubmission, verifyCertificate } = useCrypto();
 
-  const org = organizations.find(o => o.id === event.organizationId);
+  const org = organizations.find(o => o.id === event.organizationId) || organizations[0];
 
   // Stepper state
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionResult, setSubmissionResult] = useState(null);
+  const [submissionResult, setSubmissionResult] = useState(editingResponse || null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [signatureVerified, setSignatureVerified] = useState(null);
 
-  // Form State
+  // Form State initialized with editingResponse if in edit mode
   const [formData, setFormData] = useState({
-    isAnonymous: false,
-    studentId: currentUser?.studentId || '2023-10492-CS',
-    fullName: currentUser?.name || 'Leif Joshua Infante',
-    department: currentUser?.department || 'College of Information & Computing Sciences',
-    yearLevel: currentUser?.yearLevel || '3rd Year',
-    modality: event.modality === 'Hybrid' ? 'In-Person' : event.modality,
+    isAnonymous: editingResponse ? Boolean(editingResponse.isAnonymous) : false,
+    studentId: editingResponse ? (editingResponse.studentId || '') : (currentUser?.studentId || '2023-10492-CS'),
+    fullName: editingResponse ? (editingResponse.fullName || '') : (currentUser?.name || 'Leif Joshua Infante'),
+    department: editingResponse ? (editingResponse.department || '') : (currentUser?.department || 'College of Information & Computing Sciences'),
+    yearLevel: editingResponse ? (editingResponse.yearLevel || '') : (currentUser?.yearLevel || '3rd Year'),
+    modality: editingResponse ? editingResponse.modality : (event.modality === 'Hybrid' ? 'In-Person' : event.modality),
     
     // Ratings
-    ratings: {
+    ratings: editingResponse?.ratings ? { ...editingResponse.ratings } : {
       program: {
         objectives: 5,
         relevance: 5,
@@ -77,8 +76,10 @@ export default function EvaluationForm({ event, onBackToEvents }) {
     },
 
     // Comments & ECC
-    enableEccEncryption: true,
-    comments: {
+    enableEccEncryption: editingResponse ? Boolean(editingResponse.isEncrypted) : true,
+    comments: editingResponse?.comments && typeof editingResponse.comments === 'object' && !editingResponse.isEncrypted ? {
+      ...editingResponse.comments
+    } : {
       highlights: '',
       improvements: '',
       futureTopics: ''
@@ -161,7 +162,13 @@ export default function EvaluationForm({ event, onBackToEvents }) {
         finalSubmissionPayload.comments = formData.comments;
       }
 
-      const result = await submitEvaluation(finalSubmissionPayload);
+      let result;
+      if (editingResponse?.id) {
+        result = await updateEvaluation(editingResponse.id, finalSubmissionPayload);
+      } else {
+        result = await submitEvaluation(finalSubmissionPayload);
+      }
+
       setSubmissionResult(result);
       setCurrentStep(7); // Move to Inline Certificate / Confirmation step
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -761,8 +768,22 @@ export default function EvaluationForm({ event, onBackToEvents }) {
               <div className="p-4 rounded-xl bg-white border border-slate-200 text-center">
                 <h4 className="text-base sm:text-lg font-black text-indigo-950">{event.title}</h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Organized by: <strong className="text-indigo-700">{org?.name}</strong> • Date: {event.date}
+                  Organized by: <strong className="text-indigo-700">{org?.name} ({org?.shortCode})</strong> • Date: {event.date}
                 </p>
+                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-around gap-4 text-xs text-slate-600">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Organization President</span>
+                    <span className="font-bold text-slate-800">{org?.president || 'Organization President'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Faculty Adviser</span>
+                    <span className="font-bold text-slate-800">{org?.adviser || 'Organization Adviser'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">OSA Director</span>
+                    <span className="font-bold text-slate-800">Precious Bernadette Estrada</span>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-2">
@@ -783,16 +804,40 @@ export default function EvaluationForm({ event, onBackToEvents }) {
                   <span className="font-bold text-slate-800 truncate block">{new Date(submissionResult.submittedAt).toLocaleDateString()}</span>
                 </div>
               </div>
+
+              {/* Digital Signature Verification Badge */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-left">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>ECC Digital Signature:</span>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-500 break-all">
+                    {submissionResult.signature || 'SIG_ECC_P256_' + submissionResult.verificationCode}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const isValid = await verifyCertificate(org.publicKeyJwk, submissionResult.signature, submissionResult.verificationCode);
+                    setSignatureVerified(isValid ? 'VERIFIED' : 'FAILED');
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 shrink-0 cursor-pointer"
+                >
+                  {signatureVerified === 'VERIFIED' ? '✓ Signature Authentic' : 'Verify Signature'}
+                </button>
+              </div>
             </div>
 
             {/* Cryptographic Verification Footer */}
             <div className="border-t border-indigo-100 pt-4 mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span className="font-mono text-[11px]">SHA-256 Hash Verified Attendance Slip</span>
+                <span className="font-mono text-[11px]">NIST P-256 Verified Attendance Slip • biasa, maganaca, mayap</span>
               </div>
               <div className="text-center sm:text-right">
-                <span className="font-serif italic text-slate-700">Student Organizations Commission</span>
+                <span className="font-serif italic text-slate-700">Office of Student Affairs (OSA) • University of the Assumption</span>
               </div>
             </div>
           </div>

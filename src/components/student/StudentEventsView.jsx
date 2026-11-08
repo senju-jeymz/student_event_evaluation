@@ -4,14 +4,14 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   Calendar, 
   MapPin, 
-  Users, 
   Clock, 
   ShieldCheck, 
   CheckCircle2, 
   ArrowRight,
   Search,
   Filter,
-  Sparkles
+  Sparkles,
+  Building2
 } from 'lucide-react';
 
 export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
@@ -19,34 +19,41 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
   const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState('ALL');
 
   const filteredEvents = events.filter(evt => {
     const matchesSearch = evt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       evt.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (evt.tags && evt.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())));
     const matchesCategory = selectedCategory === 'ALL' || evt.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesOrg = selectedOrgFilter === 'ALL' || evt.organizationId === selectedOrgFilter;
+    return matchesSearch && matchesCategory && matchesOrg;
   });
 
-  const getOrg = (orgId) => organizations.find(o => o.id === orgId);
+  const getOrg = (orgId) => organizations.find(o => o.id === orgId) || organizations[0];
 
   return (
     <div className="space-y-6">
-      {/* Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white p-6 sm:p-8 shadow-xl">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+      {/* Institutional Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-950 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 shadow-xl">
+        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-xs font-semibold mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold mb-3">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            Elliptic Curve Cryptography (P-256) Verified Protection
+            Elliptic Curve Cryptography (NIST P-256) Verified Protection
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Campus Student Organization Events
+            University Student Organization Events
           </h1>
           <p className="mt-2 text-indigo-100 text-sm sm:text-base leading-relaxed">
             Your honest feedback drives continuous improvement across collegiate organizations. 
             All submissions are protected by public-key cryptography and can be submitted with full anonymity.
           </p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-amber-200 font-medium">
+            <span>• University of the Assumption</span>
+            <span>• Office of Student Affairs (OSA) Accredited</span>
+            <span>• 18 Recognized Organizations & Councils</span>
+          </div>
         </div>
       </div>
 
@@ -56,26 +63,52 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by event title, venue, or topic..."
+            placeholder="Search by event title, venue, or keyword..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-          >
-            <option value="ALL">All Categories</option>
-            <option value="Competitions & Workshops">Competitions & Workshops</option>
-            <option value="Conferences & Seminars">Conferences & Seminars</option>
-            <option value="Leadership & Governance">Leadership & Governance</option>
-            <option value="Outreach & Civic Action">Outreach & Civic Action</option>
-          </select>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Organization filter */}
+          <div className="flex items-center gap-1.5">
+            <Building2 className="w-4 h-4 text-slate-400" />
+            <select
+              aria-label="Filter by Organization"
+              value={selectedOrgFilter}
+              onChange={(e) => setSelectedOrgFilter(e.target.value)}
+              className="text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="ALL">All 18 Organizations</option>
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>
+                  {org.shortCode} — {org.name.length > 28 ? org.name.substring(0, 28) + '...' : org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Category filter */}
+          <div className="flex items-center gap-1.5">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <select
+              aria-label="Filter by Event Category"
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="ALL">All Categories</option>
+              <option value="University Assembly">University Assembly</option>
+              <option value="Leadership & Governance">Leadership & Governance</option>
+              <option value="Community Celebration">Community Celebration</option>
+              <option value="Cultural & Holiday">Cultural & Holiday</option>
+              <option value="Academic Symposium">Academic Symposium</option>
+              <option value="Business Conference">Business Conference</option>
+              <option value="Hackathon & Tech">Hackathon & Tech</option>
+              <option value="Technical Workshop">Technical Workshop</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -85,6 +118,7 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
           const org = getOrg(evt.organizationId);
           const alreadySubmitted = currentUser?.studentId ? hasStudentEvaluated(currentUser.studentId, evt.id) : false;
           const userResponse = responses.find(r => r.eventId === evt.id && r.studentId === currentUser?.studentId);
+          const badgeClass = org?.palette?.badge || 'bg-indigo-50 text-indigo-700 border-indigo-100';
 
           return (
             <div
@@ -95,10 +129,13 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
                 {/* Header with Org & Badge */}
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border ${badgeClass}`}>
                       {org?.shortCode || 'RSO'} • {evt.category}
                     </span>
                     <p className="text-xs font-medium text-slate-500 mt-1.5">{org?.name}</p>
+                    <p className="text-[11px] text-slate-400">
+                      Adviser: <span className="font-medium text-slate-600">{org?.adviser || 'Department Adviser'}</span>
+                    </p>
                   </div>
 
                   {evt.eccEncryptionRequired && (
@@ -132,6 +169,14 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
                   </div>
                 </div>
 
+                {/* Speakers */}
+                {evt.speakers && evt.speakers.length > 0 && (
+                  <div className="mt-3 text-xs text-slate-500">
+                    <span className="font-semibold text-slate-700">Speakers: </span>
+                    <span>{Array.isArray(evt.speakers) ? evt.speakers.join(', ') : evt.speakers}</span>
+                  </div>
+                )}
+
                 {/* Tags */}
                 {evt.tags && (
                   <div className="mt-3.5 flex flex-wrap gap-1.5">
@@ -150,7 +195,7 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
                   {alreadySubmitted ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                      Evaluation Completed
+                      Evaluated
                     </span>
                   ) : evt.evaluationOpen ? (
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700">
@@ -158,7 +203,9 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
                       Evaluation Open
                     </span>
                   ) : (
-                    <span className="text-xs font-medium text-slate-500">Evaluation Closed</span>
+                    <span className="text-xs font-medium text-slate-500">
+                      {evt.status === 'COMPLETED' ? 'Event Concluded' : 'Upcoming Event'}
+                    </span>
                   )}
                 </div>
 
@@ -168,7 +215,7 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
                       onClick={() => onViewSlip(userResponse)}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-all cursor-pointer"
                     >
-                      View My Slip
+                      View Receipt
                     </button>
                   ) : evt.evaluationOpen ? (
                     <button
@@ -183,7 +230,7 @@ export default function StudentEventsView({ onSelectEvent, onViewSlip }) {
                       disabled
                       className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-semibold cursor-not-allowed"
                     >
-                      Not Available
+                      Evaluation Closed
                     </button>
                   )}
                 </div>

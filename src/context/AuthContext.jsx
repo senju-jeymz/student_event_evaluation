@@ -1,17 +1,17 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { MOCK_USERS, ROLES } from '../data/mockData';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  // Store active user in localStorage or default to student / officer
+  // Store active user in localStorage or default to SSITE officer
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('active_user_id');
     if (saved) {
       const found = MOCK_USERS.find(u => u.id === saved);
       if (found) return found;
     }
-    return MOCK_USERS[2]; // Default to ACSS Officer for rich demo experience
+    return MOCK_USERS[2]; // Default to SSITE President (Hannah Samantha Lising)
   });
 
   const switchUser = (userId) => {
@@ -22,16 +22,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Helper allowing RSO officers to switch to any of the 18 student organizations to test and manage
+  const switchRsoOrganization = (orgId) => {
+    setCurrentUser(prev => {
+      const updated = {
+        ...prev,
+        organizationId: orgId
+      };
+      return updated;
+    });
+  };
+
   /**
-   * Strict Role & Organization Authorization Check
-   * Admin: Can manage system, view aggregate statistics, but cannot decrypt private feedback without org key
-   * UACSC: Can view university-wide metrics and UACSC events
-   * RSO: Strictly isolated to their specific organization (e.g. org_acss, org_jml)
-   * Student: Can view public events, submit evaluations, view their own certificates
+   * Role & Organization Authorization Check
    */
   const canAccessOrgData = (organizationId) => {
     if (!currentUser) return false;
-    if (currentUser.role === ROLES.ADMIN) return true; // High-level admin oversight
+    if (currentUser.role === ROLES.ADMIN) return true;
     if (currentUser.role === ROLES.UACSC && organizationId === 'org_uacsc') return true;
     if (currentUser.role === ROLES.RSO && currentUser.organizationId === organizationId) return true;
     return false;
@@ -48,6 +55,7 @@ export const AuthProvider = ({ children }) => {
       value={{
         currentUser,
         switchUser,
+        switchRsoOrganization,
         canAccessOrgData,
         isStudent,
         isAdmin,

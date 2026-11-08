@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useEvaluation } from '../../context/EvaluationContext';
 import { computeCrossOrgRankings, computeEventStats } from '../../utils/analytics';
 import StatCard from '../common/StatCard';
@@ -7,13 +7,10 @@ import {
   Calendar, 
   Trophy, 
   Star, 
-  TrendingUp, 
   Users, 
   ShieldCheck, 
-  Download,
-  Clock,
-  MapPin,
-  ExternalLink
+  Clock, 
+  MapPin 
 } from 'lucide-react';
 
 export default function UacscDashboard({ activeSubTab = 'overview', setActiveSubTab }) {
@@ -21,22 +18,23 @@ export default function UacscDashboard({ activeSubTab = 'overview', setActiveSub
   const rankings = computeCrossOrgRankings(organizations, events, responses);
   const globalStats = computeEventStats(responses);
 
-  const [filterMonth, setFilterMonth] = useState('ALL');
-
   return (
     <div className="space-y-6">
       {/* Banner */}
       <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-orange-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider bg-black/20 px-3 py-1 rounded-full border border-white/20">
-              Central Student Council Governance
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider bg-black/20 px-3 py-1 rounded-full border border-white/20">
+                Apex University Student Council
+              </span>
+              <span className="text-xs italic text-amber-200">"biasa, maganaca, mayap"</span>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-black mt-2">
               University of the Assumption Central Student Council (UACSC)
             </h1>
             <p className="mt-1 text-amber-100 text-xs sm:text-sm max-w-2xl leading-relaxed">
-              𝗧𝗵𝗲 𝗛𝗶𝗴𝗵𝗲𝘀𝘁, 𝗨𝗻𝗶𝗳𝗶𝗲𝗱, 𝗮𝗻𝗱 𝗔𝘂𝘁𝗼𝗻𝗼𝗺𝗼𝘂𝘀 𝗦𝘁𝘂𝗱𝗲𝗻𝘁 𝗚𝗼𝘃𝗲𝗿𝗻𝗶𝗻𝗴 𝗕𝗼𝗱𝘆 𝗶𝗻 𝘁𝗵𝗲 𝗨𝗻𝗶𝘃𝗲𝗿𝘀𝗶𝘁𝘆 𝗼𝗳 𝘁𝗵𝗲 𝗔𝘀𝘀𝘂𝗺𝗽𝘁𝗶𝗼𝗻.
+              President: <strong>Garnett G. Tolentino</strong> • Adviser: <strong>Dax Nathaniel Bondoc, MPA</strong>
             </p>
           </div>
 
@@ -47,7 +45,7 @@ export default function UacscDashboard({ activeSubTab = 'overview', setActiveSub
                 activeSubTab === 'rankings' ? 'bg-white text-amber-900 shadow-md' : 'bg-black/20 text-white hover:bg-black/30'
               }`}
             >
-              RSO Rankings
+              18 RSOs Rankings
             </button>
             <button
               onClick={() => setActiveSubTab('calendar')}
@@ -61,92 +59,89 @@ export default function UacscDashboard({ activeSubTab = 'overview', setActiveSub
         </div>
       </div>
 
-      {/* Overview Stat Cards */}
+      {/* KPI Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="University Satisfaction Index"
-          value={`${globalStats.overallAverage} / 5.0`}
-          subtext="Campus-wide aggregate score"
-          icon={Star}
+          title="Campus Organizations"
+          value={organizations.length}
+          subtitle="Accredited councils & RSOs"
+          icon={Building2}
           color="amber"
-          badge="Above Target"
         />
         <StatCard
-          title="Total Student Responses"
+          title="University-Wide Submissions"
           value={globalStats.total}
-          subtext="Captured through online forms"
+          subtitle="Evaluation slips recorded"
           icon={Users}
           color="indigo"
         />
         <StatCard
-          title="Active Student Orgs"
-          value={organizations.length}
-          subtext="RSOs & Academic Societies"
-          icon={Building2}
-          color="emerald"
+          title="Collegiate Rating Average"
+          value={`${globalStats.averageRating} / 5.0`}
+          subtitle="Aggregate participant score"
+          icon={Star}
+          color="rose"
         />
         <StatCard
-          title="Campus Net Promoter Score"
-          value={`+${globalStats.nps}`}
-          subtext={`${globalStats.promoters} Promoters campus-wide`}
-          icon={TrendingUp}
-          color="purple"
+          title="ECC Security Compliance"
+          value="100%"
+          subtitle="Native NIST P-256 enabled"
+          icon={ShieldCheck}
+          color="emerald"
         />
       </div>
 
-      {/* Sub-view: Cross-Org Rankings Leaderboard */}
+      {/* Sub-view: Cross-Org Rankings */}
       {(activeSubTab === 'overview' || activeSubTab === 'rankings') && (
         <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
-                Cross-Organization Performance Benchmarks
+                Recognized Student Organization Evaluation Standings
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Aggregated satisfaction scores based on student post-event evaluations.
+                Benchmarked by participant ratings, evaluation volume, and continuous improvement responsiveness.
               </p>
             </div>
-            <span className="text-xs font-bold text-slate-400">AY 2026-2027</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80 uppercase tracking-wider text-[10px]">
+              <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
                 <tr>
-                  <th className="p-3">Rank</th>
-                  <th className="p-3">Student Organization</th>
-                  <th className="p-3">Category</th>
-                  <th className="p-3 text-center">Events</th>
-                  <th className="p-3 text-center">Submissions</th>
-                  <th className="p-3 text-center">Satisfaction</th>
-                  <th className="p-3 text-center">NPS</th>
-                  <th className="p-3 text-center">ECC Protection</th>
+                  <th className="py-3 px-3">Rank</th>
+                  <th className="py-3 px-3">Organization & Leadership</th>
+                  <th className="py-3 px-3">College</th>
+                  <th className="py-3 px-3">Events Hosted</th>
+                  <th className="py-3 px-3">Evaluations</th>
+                  <th className="py-3 px-3">Avg Rating</th>
+                  <th className="py-3 px-3 text-right">ECC Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {rankings.map((org, index) => (
-                  <tr key={org.organizationId} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="p-3 font-black text-slate-700">
-                      {index === 0 ? '🥇 #1' : index === 1 ? '🥈 #2' : index === 2 ? '🥉 #3' : `#${index + 1}`}
+                {rankings.map((r, idx) => (
+                  <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-3 whitespace-nowrap font-bold text-slate-800">
+                      {idx === 0 ? '🥇 #1' : idx === 1 ? '🥈 #2' : idx === 2 ? '🥉 #3' : `#${idx + 1}`}
                     </td>
-                    <td className="p-3">
-                      <span className="font-bold text-slate-900 block">{org.name}</span>
-                      <span className="text-[10px] text-slate-500 font-mono">({org.shortCode})</span>
-                    </td>
-                    <td className="p-3 text-slate-600">{org.category}</td>
-                    <td className="p-3 text-center font-bold text-slate-800">{org.totalEvents}</td>
-                    <td className="p-3 text-center font-bold text-slate-800">{org.totalResponses}</td>
-                    <td className="p-3 text-center">
-                      <span className="inline-flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                        ★ {org.overallAverage > 0 ? org.overallAverage.toFixed(2) : 'N/A'}
+                    <td className="py-3.5 px-3">
+                      <span className="font-bold text-slate-900 block">{r.name}</span>
+                      <span className="text-[11px] text-slate-500">
+                        Pres: <strong>{r.president}</strong> • Adv: <strong>{r.adviser || 'Department Adviser'}</strong>
                       </span>
                     </td>
-                    <td className="p-3 text-center font-bold text-indigo-700">
-                      {org.totalResponses > 0 ? `+${org.nps}` : 'N/A'}
+                    <td className="py-3.5 px-3 text-slate-600">{r.college}</td>
+                    <td className="py-3.5 px-3 font-semibold text-slate-700">{r.eventCount}</td>
+                    <td className="py-3.5 px-3 font-semibold text-slate-700">{r.responseCount}</td>
+                    <td className="py-3.5 px-3 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        {r.averageRating}
+                      </span>
                     </td>
-                    <td className="p-3 text-center">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[10px]">
                         <ShieldCheck className="w-3 h-3 text-emerald-600" />
                         P-256
                       </span>
@@ -166,7 +161,7 @@ export default function UacscDashboard({ activeSubTab = 'overview', setActiveSub
             <div>
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-indigo-600" />
-                Collegiate Events Master Calendar
+                University Events Master Calendar
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 Timeline and evaluation status of campus activities across all student organizations.
@@ -215,9 +210,11 @@ export default function UacscDashboard({ activeSubTab = 'overview', setActiveSub
                     <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${
                       evt.evaluationOpen
                         ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                        : 'bg-slate-100 text-slate-600'
+                        : evt.status === 'COMPLETED'
+                        ? 'bg-slate-100 text-slate-600'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200'
                     }`}>
-                      {evt.evaluationOpen ? 'Evaluations Open' : 'Concluded'}
+                      {evt.evaluationOpen ? 'Evaluations Open' : evt.status === 'COMPLETED' ? 'Concluded' : 'Upcoming Event'}
                     </span>
                   </div>
                 </div>

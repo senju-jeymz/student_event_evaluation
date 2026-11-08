@@ -5,7 +5,9 @@ import {
   decryptFeedbackWithEcc,
   protectPrivateKeyWithPassphrase,
   unlockPrivateKeyWithPassphrase,
-  generateVerificationHash
+  generateVerificationHash,
+  signDataWithEcdsa,
+  verifyDataWithEcdsa
 } from '../utils/cryptoUtils';
 import { MOCK_AUDIT_LOGS } from '../data/mockData';
 
@@ -218,7 +220,9 @@ export const CryptoProvider = ({ children }) => {
         vaultRecords,
         encryptSubmission,
         decryptSubmission,
-        generateVerificationHash
+        generateVerificationHash,
+        signCertificate: signDataWithEcdsa,
+        verifyCertificate: verifyDataWithEcdsa
       }}
     >
       {children}

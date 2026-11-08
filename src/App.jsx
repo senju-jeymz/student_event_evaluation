@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CryptoProvider } from './context/CryptoContext';
 import { EvaluationProvider, useEvaluation } from './context/EvaluationContext';
-import { ROLES } from './data/mockData';
 import Navbar from './components/common/Navbar';
 
 // Student Components
@@ -30,30 +29,36 @@ function AppContent() {
   const { events } = useEvaluation();
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState('rso_dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (isStudent) return 'student_events';
+    if (isRSO) return 'rso_dashboard';
+    if (isUACSC) return 'uacsc_overview';
+    if (isAdmin) return 'admin_governance';
+    return 'rso_dashboard';
+  });
   
+  // Track role changes to synchronize default tabs
+  const [prevRole, setPrevRole] = useState(currentUser?.role);
+  if (currentUser?.role !== prevRole) {
+    setPrevRole(currentUser?.role);
+    if (isStudent) setActiveTab('student_events');
+    else if (isRSO) setActiveTab('rso_dashboard');
+    else if (isUACSC) setActiveTab('uacsc_overview');
+    else if (isAdmin) setActiveTab('admin_governance');
+  }
+
   // Active Event for evaluation
   const [targetEvent, setTargetEvent] = useState(events[0]);
-
-  // Sync default tab when user switches role
-  useEffect(() => {
-    if (isStudent) {
-      setActiveTab('student_events');
-    } else if (isRSO) {
-      setActiveTab('rso_dashboard');
-    } else if (isUACSC) {
-      setActiveTab('uacsc_overview');
-    } else if (isAdmin) {
-      setActiveTab('admin_governance');
-    }
-  }, [currentUser?.role, currentUser?.organizationId]);
+  const [editingResponse, setEditingResponse] = useState(null);
 
   const handleStartEvaluation = (event) => {
     setTargetEvent(event);
+    setEditingResponse(null);
     setActiveTab('student_eval_form');
   };
 
   const handleBackToEvents = () => {
+    setEditingResponse(null);
     setActiveTab('student_events');
   };
 
@@ -71,6 +76,7 @@ function AppContent() {
                 onViewSlip={(response) => {
                   const evt = events.find(e => e.id === response.eventId) || events[0];
                   setTargetEvent(evt);
+                  setEditingResponse(response);
                   setActiveTab('student_eval_form');
                 }}
               />
@@ -79,6 +85,7 @@ function AppContent() {
             {activeTab === 'student_eval_form' && targetEvent && (
               <EvaluationForm
                 event={targetEvent}
+                editingResponse={editingResponse}
                 onBackToEvents={handleBackToEvents}
               />
             )}
@@ -88,6 +95,13 @@ function AppContent() {
                 onSelectSlip={(response) => {
                   const evt = events.find(e => e.id === response.eventId) || events[0];
                   setTargetEvent(evt);
+                  setEditingResponse(response);
+                  setActiveTab('student_eval_form');
+                }}
+                onEditSlip={(response) => {
+                  const evt = events.find(e => e.id === response.eventId) || events[0];
+                  setTargetEvent(evt);
+                  setEditingResponse(response);
                   setActiveTab('student_eval_form');
                 }}
               />

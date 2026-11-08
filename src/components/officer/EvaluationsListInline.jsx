@@ -8,25 +8,24 @@ import {
   Lock, 
   Unlock, 
   Search, 
-  Filter, 
   Download, 
   ChevronDown, 
   ChevronUp, 
   Star, 
   CheckCircle2, 
-  AlertCircle,
-  EyeOff,
-  User,
-  PlusCircle,
-  Key
+  PlusCircle, 
+  Key,
+  Trash2,
+  AlertTriangle,
+  FileText
 } from 'lucide-react';
 
 export default function EvaluationsListInline() {
   const { currentUser } = useAuth();
-  const { organizations, events, responses, addActionPlan, updateResponseActionStatus } = useEvaluation();
-  const { isKeyUnlocked, decryptSubmission, unlockOrgPrivateKey, loadPrivateKeyDirectly, unlockedPrivateKeys } = useCrypto();
+  const { organizations, events, responses, addActionPlan, updateResponseActionStatus, deleteEvaluation } = useEvaluation();
+  const { isKeyUnlocked, decryptSubmission, unlockOrgPrivateKey } = useCrypto();
 
-  const currentOrg = organizations.find(o => o.id === currentUser?.organizationId) || organizations[1]; // default ACSS
+  const currentOrg = organizations.find(o => o.id === currentUser?.organizationId) || organizations[0];
 
   // Filter evaluations strictly belonging to this authorized organization
   const orgEvents = events.filter(e => e.organizationId === currentOrg.id);
@@ -48,11 +47,28 @@ export default function EvaluationsListInline() {
 
   // Inline Passphrase unlock drawer state
   const [passphraseInput, setPassphraseInput] = useState('');
-  const [isUnlockingVault, setIsUnlockingVault] = useState(false);
+  const [showUnlockDrawer, setShowUnlockDrawer] = useState(false);
 
   // Inline Action plan creation from feedback
   const [actionTitleInput, setActionTitleInput] = useState('');
   const [actionAddedId, setActionAddedId] = useState(null);
+
+  // Inline Delete confirmation tracker (Zero Modals!)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [officerNotes, setOfficerNotes] = useState({});
+  const [statusSavedId, setStatusSavedId] = useState(null);
+
+  const handleDeleteResponse = (id) => {
+    deleteEvaluation(id);
+    setConfirmDeleteId(null);
+  };
+
+  const handleUpdateStatus = (id, newStatus) => {
+    const note = officerNotes[id] || '';
+    updateResponseActionStatus(id, newStatus, note);
+    setStatusSavedId(id);
+    setTimeout(() => setStatusSavedId(null), 2000);
+  };
 
   const filteredResponses = orgResponses.filter(r => {
     const matchesEvent = selectedEventId === 'ALL' || r.eventId === selectedEventId;
@@ -101,15 +117,13 @@ export default function EvaluationsListInline() {
   // Unlock Vault with Passphrase inline
   const handleUnlockVaultInline = async (e) => {
     e.preventDefault();
-    setIsUnlockingVault(true);
     setDecryptError('');
     try {
       await unlockOrgPrivateKey(currentOrg.id, passphraseInput || 'rso-secret-passphrase', currentUser?.name);
       setPassphraseInput('');
+      setShowUnlockDrawer(false);
     } catch (err) {
       setDecryptError('Passphrase error: ' + err.message);
-    } finally {
-      setIsUnlockingVault(false);
     }
   };
 
@@ -152,14 +166,54 @@ export default function EvaluationsListInline() {
           </p>
         </div>
 
-        <button
-          onClick={() => exportResponsesToCsv(orgResponses, `${currentOrg.shortCode}_Evaluations`)}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
-        >
-          <Download className="w-4 h-4" />
-          Export All to CSV
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!isKeyUnlocked(currentOrg.id) ? (
+            <button
+              onClick={() => setShowUnlockDrawer(!showUnlockDrawer)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+            >
+              <Lock className="w-4 h-4" />
+              {showUnlockDrawer ? 'Close Vault' : 'Unlock Private Key'}
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+              <Unlock className="w-4 h-4 text-emerald-600" />
+              Key Vault Unlocked
+            </span>
+          )}
+
+          <button
+            onClick={() => exportResponsesToCsv(orgResponses, `${currentOrg.shortCode}_Evaluations`)}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
+          </button>
+        </div>
       </div>
+
+      {/* Inline Passphrase Unlock Drawer (Zero Modals!) */}
+      {showUnlockDrawer && !isKeyUnlocked(currentOrg.id) && (
+        <form onSubmit={handleUnlockVaultInline} className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-wrap items-center gap-3 text-xs animate-fade-in">
+          <div className="flex items-center gap-2 font-bold text-amber-900">
+            <Key className="w-4 h-4 text-amber-700" />
+            <span>Enter Officer Passphrase to Unlock ECC Private Key:</span>
+          </div>
+          <input
+            type="password"
+            placeholder="Enter passphrase (default: rso-secret-passphrase)"
+            value={passphraseInput}
+            onChange={(e) => setPassphraseInput(e.target.value)}
+            className="flex-1 min-w-[200px] px-3 py-2 rounded-xl border border-amber-300 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold cursor-pointer"
+          >
+            Unlock Now
+          </button>
+        </form>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
@@ -454,6 +508,82 @@ export default function EvaluationsListInline() {
                           <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5" /> Action Plan item created successfully!
                           </span>
+                        )}
+                      </div>
+
+                      {/* Administrative Review & Action Status (CRUD Update & Delete) */}
+                      <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <FileText className="w-4 h-4 text-slate-500" />
+                            Administrative Review Status & Notes
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={r.actionPlanStatus || 'IN_REVIEW'}
+                              onChange={(e) => handleUpdateStatus(r.id, e.target.value)}
+                              className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-slate-50 cursor-pointer"
+                            >
+                              <option value="IN_REVIEW">Status: IN REVIEW</option>
+                              <option value="ADDRESSED">Status: ADDRESSED</option>
+                              <option value="ARCHIVED">Status: ARCHIVED</option>
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(r.id)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 cursor-pointer transition-all"
+                              title="Delete this submission record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete Submission
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <label className="text-[11px] font-bold text-slate-600 block mb-1">Officer Internal Review Notes:</label>
+                          <textarea
+                            rows={2}
+                            placeholder="Add internal resolution or committee notes..."
+                            value={officerNotes[r.id] !== undefined ? officerNotes[r.id] : (r.officerRemarks || '')}
+                            onChange={(e) => setOfficerNotes({ ...officerNotes, [r.id]: e.target.value })}
+                            className="w-full p-2 text-xs rounded-lg border border-slate-300 bg-slate-50 focus:bg-white"
+                          />
+                        </div>
+
+                        {statusSavedId === r.id && (
+                          <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Review status updated!
+                          </span>
+                        )}
+
+                        {/* Inline Delete Confirmation Banner */}
+                        {confirmDeleteId === r.id && (
+                          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-2">
+                            <div className="flex items-center gap-2 font-bold">
+                              <AlertTriangle className="w-4 h-4 text-rose-600" />
+                              Confirm Evaluation Deletion
+                            </div>
+                            <p className="text-rose-700">
+                              Permanently remove this evaluation record (ID: {r.id})? This action cannot be reversed.
+                            </p>
+                            <div className="flex items-center gap-2 pt-1">
+                              <button
+                                onClick={() => handleDeleteResponse(r.id)}
+                                className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold cursor-pointer"
+                              >
+                                Yes, Permanently Delete
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="px-3 py-1 rounded-lg bg-white border border-slate-300 text-slate-700 font-semibold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </div>

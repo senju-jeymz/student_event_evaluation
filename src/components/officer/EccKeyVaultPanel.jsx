@@ -11,7 +11,6 @@ import {
   Copy, 
   Check, 
   AlertTriangle, 
-  FileText,
   CheckCircle2
 } from 'lucide-react';
 
@@ -22,12 +21,10 @@ export default function EccKeyVaultPanel() {
     createOrgEccKeyPair, 
     unlockOrgPrivateKey, 
     lockOrgPrivateKey, 
-    isKeyUnlocked, 
-    unlockedPrivateKeys,
-    vaultRecords 
+    isKeyUnlocked
   } = useCrypto();
 
-  const currentOrg = organizations.find(o => o.id === currentUser?.organizationId) || organizations[1]; // default ACSS
+  const currentOrg = organizations.find(o => o.id === currentUser?.organizationId) || organizations[0];
   const isUnlocked = isKeyUnlocked(currentOrg.id);
 
   const [passphrase, setPassphrase] = useState('');
