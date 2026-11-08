@@ -227,7 +227,7 @@ export const INITIAL_ORGANIZATIONS = [
     president: 'Garnett G. Tolentino',
     adviser: 'Dax Nathaniel Bondoc, MPA',
     college: 'University-Wide',
-    category: 'Apex University Student Council',
+    category: 'UACSC',
     status: 'ACTIVE',
     paletteKey: 'AMBER',
     palette: COLOR_PALETTES.AMBER,

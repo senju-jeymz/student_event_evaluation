@@ -24,17 +24,14 @@ export default function UacscDashboard({ activeSubTab = 'overview', setActiveSub
       <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-orange-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider bg-black/20 px-3 py-1 rounded-full border border-white/20">
-                Apex University Student Council
-              </span>
-              <span className="text-xs italic text-amber-200">"biasa, maganaca, mayap"</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-black mt-2">
               University of the Assumption Central Student Council (UACSC)
             </h1>
             <p className="mt-1 text-amber-100 text-xs sm:text-sm max-w-2xl leading-relaxed">
-              President: <strong>Garnett G. Tolentino</strong> • Adviser: <strong>Dax Nathaniel Bondoc, MPA</strong>
+              President: <strong>Garnett G. Tolentino</strong>
+            </p>
+            <p className="mt-1 text-amber-100 text-xs sm:text-sm max-w-2xl leading-relaxed">
+              Adviser: <strong>Dax Nathaniel Bondoc, MPA</strong>
             </p>
           </div>
 

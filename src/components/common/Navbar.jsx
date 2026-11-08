@@ -1,7 +1,8 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useEvaluation } from '../../context/EvaluationContext';
-import { ROLES, UNIVERSITY_CONFIG } from '../../data/mockData';
+import { ROLES } from '../../data/mockData';
+import { UNIVERSITY_CONFIG } from '../../config/organizationConfig';
 import { 
   UserCheck, 
   Lock,
@@ -51,10 +52,6 @@ export default function Navbar({ activeTab, setActiveTab }) {
           </div>
 
           <div className="hidden md:flex items-center gap-1.5 pl-3 border-l border-slate-700">
-            <span className="text-slate-400 text-[11px]">Security:</span>
-            <span className="text-emerald-400 font-mono text-[11px] bg-slate-800 px-2 py-0.5 rounded border border-emerald-500/30">
-              NIST P-256 (ECDH + AES-GCM + ECDSA)
-            </span>
           </div>
         </div>
 
@@ -70,7 +67,9 @@ export default function Navbar({ activeTab, setActiveTab }) {
                 onChange={(e) => switchRsoOrganization(e.target.value)}
                 className="bg-slate-800 text-amber-300 text-xs font-bold rounded-lg px-2 py-1 border border-amber-500/40 focus:outline-none cursor-pointer"
               >
-                {organizations.map(org => (
+                {organizations
+                .filter(org => org.shortCode !== 'UACSC')
+                .map(org => (
                   <option key={org.id} value={org.id}>
                     {org.shortCode} — {org.name}
                   </option>

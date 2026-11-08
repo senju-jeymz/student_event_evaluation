@@ -136,7 +136,7 @@ export default function AdminGovernance({ activeSubTab = 'overview', setActiveSu
               Student Organizations Governance & Audit Console
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Director: <strong className="text-slate-800">Ms. Precious Bernadette Estrada</strong> • Institutional compliance, public-key infrastructure, and cryptographic audit records.
+              Director: <strong className="text-slate-800">Ms. Precious Bernadette Estrada</strong>
             </p>
           </div>
 
