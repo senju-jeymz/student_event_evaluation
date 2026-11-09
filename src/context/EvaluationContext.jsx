@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api } from '../services/api';
 import {
   MOCK_ORGANIZATIONS,
   MOCK_EVENTS,
@@ -9,90 +10,50 @@ import {
 import { generateVerificationHash } from '../utils/cryptoUtils';
 
 const EvaluationContext = createContext();
-const DATA_VERSION = 'ua_2026_v3';
 
 export const EvaluationProvider = ({ children }) => {
-  // Check version to ensure the new 18 UA organizations and events load smoothly
-  useEffect(() => {
-    const currentVer = localStorage.getItem('system_data_version');
-    if (currentVer !== DATA_VERSION) {
-      localStorage.setItem('system_organizations', JSON.stringify(MOCK_ORGANIZATIONS));
-      localStorage.setItem('system_events', JSON.stringify(MOCK_EVENTS));
-      localStorage.setItem('system_responses', JSON.stringify(MOCK_RESPONSES));
-      localStorage.setItem('system_action_plans', JSON.stringify(MOCK_ACTION_PLANS));
-      localStorage.setItem('system_form_templates', JSON.stringify(MOCK_FORM_TEMPLATES));
-      localStorage.setItem('system_data_version', DATA_VERSION);
-    }
-  }, []);
-
-  const [organizations, setOrganizations] = useState(() => {
-    const currentVer = localStorage.getItem('system_data_version');
-    if (currentVer !== DATA_VERSION) return MOCK_ORGANIZATIONS;
-    const saved = localStorage.getItem('system_organizations');
-    return saved ? JSON.parse(saved) : MOCK_ORGANIZATIONS;
-  });
-
-  const [events, setEvents] = useState(() => {
-    const currentVer = localStorage.getItem('system_data_version');
-    if (currentVer !== DATA_VERSION) return MOCK_EVENTS;
-    const saved = localStorage.getItem('system_events');
-    return saved ? JSON.parse(saved) : MOCK_EVENTS;
-  });
-
-  const [responses, setResponses] = useState(() => {
-    const currentVer = localStorage.getItem('system_data_version');
-    if (currentVer !== DATA_VERSION) return MOCK_RESPONSES;
-    const saved = localStorage.getItem('system_responses');
-    return saved ? JSON.parse(saved) : MOCK_RESPONSES;
-  });
-
-  const [actionPlans, setActionPlans] = useState(() => {
-    const currentVer = localStorage.getItem('system_data_version');
-    if (currentVer !== DATA_VERSION) return MOCK_ACTION_PLANS;
-    const saved = localStorage.getItem('system_action_plans');
-    return saved ? JSON.parse(saved) : MOCK_ACTION_PLANS;
-  });
-
-  const [formTemplates, setFormTemplates] = useState(() => {
-    const currentVer = localStorage.getItem('system_data_version');
-    if (currentVer !== DATA_VERSION) return MOCK_FORM_TEMPLATES;
-    const saved = localStorage.getItem('system_form_templates');
-    return saved ? JSON.parse(saved) : MOCK_FORM_TEMPLATES;
-  });
+  const [organizations, setOrganizations] = useState(MOCK_ORGANIZATIONS);
+  const [events, setEvents] = useState(MOCK_EVENTS);
+  const [responses, setResponses] = useState(MOCK_RESPONSES);
+  const [actionPlans, setActionPlans] = useState(MOCK_ACTION_PLANS);
+  const [formTemplates, setFormTemplates] = useState(MOCK_FORM_TEMPLATES);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   // Selected event for quick preview or evaluation
   const [selectedEventId, setSelectedEventId] = useState(MOCK_EVENTS[0]?.id || 'evt_uacsc_pamuklat');
 
-  // Sync to localStorage
-  useEffect(() => {
-    localStorage.setItem('system_organizations', JSON.stringify(organizations));
-  }, [organizations]);
+  // Load live data from Backend API
+  const refreshData = useCallback(async () => {
+    try {
+      const [orgsRes, evtsRes, respsRes, plansRes] = await Promise.allSettled([
+        api.organizations.getAll(),
+        api.events.getAll(),
+        api.evaluations.getAll(),
+        api.actionPlans.getAll()
+      ]);
+
+      if (orgsRes.status === 'fulfilled' && Array.isArray(orgsRes.value) && orgsRes.value.length > 0) {
+        setOrganizations(orgsRes.value);
+      }
+      if (evtsRes.status === 'fulfilled' && Array.isArray(evtsRes.value)) {
+        setEvents(evtsRes.value);
+      }
+      if (respsRes.status === 'fulfilled' && Array.isArray(respsRes.value)) {
+        setResponses(respsRes.value);
+      }
+      if (plansRes.status === 'fulfilled' && Array.isArray(plansRes.value)) {
+        setActionPlans(plansRes.value);
+      }
+    } catch (err) {
+      console.warn('Backend API sync notice:', err.message);
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('system_events', JSON.stringify(events));
-  }, [events]);
-
-  useEffect(() => {
-    localStorage.setItem('system_responses', JSON.stringify(responses));
-  }, [responses]);
-
-  useEffect(() => {
-    localStorage.setItem('system_action_plans', JSON.stringify(actionPlans));
-  }, [actionPlans]);
-
-  useEffect(() => {
-    localStorage.setItem('system_form_templates', JSON.stringify(formTemplates));
-  }, [formTemplates]);
-
-  // Reset to default institutional configuration
-  const resetToDefaultData = () => {
-    setOrganizations(MOCK_ORGANIZATIONS);
-    setEvents(MOCK_EVENTS);
-    setResponses(MOCK_RESPONSES);
-    setActionPlans(MOCK_ACTION_PLANS);
-    setFormTemplates(MOCK_FORM_TEMPLATES);
-    localStorage.setItem('system_data_version', DATA_VERSION);
-  };
+    refreshData();
+  }, [refreshData]);
 
   // Check if a student has already submitted for this event (Duplicate prevention)
   const hasStudentEvaluated = (studentId, eventId, excludeResponseId = null) => {
@@ -108,67 +69,65 @@ export const EvaluationProvider = ({ children }) => {
 
   // CREATE: Submit a new evaluation
   const submitEvaluation = async (evaluationPayload) => {
-    if (!evaluationPayload.isAnonymous && evaluationPayload.studentId) {
-      if (hasStudentEvaluated(evaluationPayload.studentId, evaluationPayload.eventId)) {
-        throw new Error('Duplicate submission detected. You have already submitted an evaluation for this event.');
-      }
+    try {
+      const newResponse = await api.evaluations.submit(evaluationPayload);
+      setResponses(prev => [newResponse, ...prev.filter(r => r.id !== newResponse.id)]);
+      return newResponse;
+    } catch (err) {
+      // Fallback local creation if offline
+      const responseId = 'resp_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+      const submittedAt = new Date().toISOString();
+      const verificationCode = await generateVerificationHash({
+        id: responseId,
+        eventId: evaluationPayload.eventId,
+        submittedAt,
+        studentId: evaluationPayload.isAnonymous ? 'ANON' : evaluationPayload.studentId
+      });
+      const localResponse = {
+        id: responseId,
+        ...evaluationPayload,
+        verificationCode: 'VERIF-' + verificationCode,
+        submittedAt,
+        actionPlanStatus: 'IN_REVIEW',
+        signature: 'SIG_ECC_P256_' + verificationCode
+      };
+      setResponses(prev => [localResponse, ...prev]);
+      return localResponse;
     }
-
-    const responseId = 'resp_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
-    const submittedAt = new Date().toISOString();
-
-    const verificationCode = await generateVerificationHash({
-      id: responseId,
-      eventId: evaluationPayload.eventId,
-      submittedAt,
-      studentId: evaluationPayload.isAnonymous ? 'ANON' : evaluationPayload.studentId
-    });
-
-    const newResponse = {
-      id: responseId,
-      ...evaluationPayload,
-      verificationCode: 'VERIF-' + verificationCode,
-      submittedAt,
-      actionPlanStatus: 'IN_REVIEW',
-      signature: 'SIG_ECC_P256_' + verificationCode
-    };
-
-    setResponses(prev => [newResponse, ...prev]);
-    return newResponse;
   };
 
   // UPDATE: Edit an existing evaluation
   const updateEvaluation = async (responseId, updatedPayload) => {
-    const existing = responses.find(r => r.id === responseId);
-    if (!existing) throw new Error('Evaluation submission not found');
-
-    const updatedSubmittedAt = new Date().toISOString();
-    const updatedVerificationCode = await generateVerificationHash({
-      id: responseId,
-      eventId: updatedPayload.eventId || existing.eventId,
-      submittedAt: updatedSubmittedAt,
-      studentId: updatedPayload.isAnonymous ? 'ANON' : (updatedPayload.studentId || existing.studentId)
-    });
-
-    const updatedResponse = {
-      ...existing,
-      ...updatedPayload,
-      lastUpdatedAt: updatedSubmittedAt,
-      verificationCode: 'VERIF-' + updatedVerificationCode,
-      signature: 'SIG_ECC_P256_' + updatedVerificationCode + '_REV'
-    };
-
-    setResponses(prev => prev.map(r => (r.id === responseId ? updatedResponse : r)));
-    return updatedResponse;
+    try {
+      const updatedResponse = await api.evaluations.update(responseId, updatedPayload);
+      setResponses(prev => prev.map(r => (r.id === responseId ? updatedResponse : r)));
+      return updatedResponse;
+    } catch (err) {
+      const existing = responses.find(r => r.id === responseId);
+      if (!existing) throw new Error('Evaluation submission not found');
+      const updatedSubmittedAt = new Date().toISOString();
+      const updatedResponse = {
+        ...existing,
+        ...updatedPayload,
+        lastUpdatedAt: updatedSubmittedAt
+      };
+      setResponses(prev => prev.map(r => (r.id === responseId ? updatedResponse : r)));
+      return updatedResponse;
+    }
   };
 
   // DELETE: Withdraw or remove an evaluation
-  const deleteEvaluation = (responseId) => {
+  const deleteEvaluation = async (responseId) => {
     setResponses(prev => prev.filter(r => r.id !== responseId));
+    try {
+      await api.evaluations.delete(responseId);
+    } catch (err) {
+      console.warn('API delete evaluation notice:', err.message);
+    }
   };
 
   // Update response action plan review status or officer remarks
-  const updateResponseActionStatus = (responseId, status, officerRemarks = null) => {
+  const updateResponseActionStatus = async (responseId, status, officerRemarks = null) => {
     setResponses(prev => prev.map(r => {
       if (r.id === responseId) {
         return {
@@ -179,6 +138,12 @@ export const EvaluationProvider = ({ children }) => {
       }
       return r;
     }));
+
+    try {
+      await api.evaluations.updateStatus(responseId, status, officerRemarks);
+    } catch (err) {
+      console.warn('API update evaluation status notice:', err.message);
+    }
   };
 
   // ==========================================
@@ -186,21 +151,27 @@ export const EvaluationProvider = ({ children }) => {
   // ==========================================
 
   // CREATE: Add new event
-  const addEvent = (eventData) => {
-    const newEvent = {
-      ...eventData,
-      id: 'evt_' + Date.now().toString(36),
-      evaluationOpen: eventData.evaluationOpen !== undefined ? eventData.evaluationOpen : true,
-      status: eventData.status || (eventData.evaluationOpen ? 'ACTIVE' : 'UPCOMING'),
-      expectedAttendees: Number(eventData.expectedAttendees) || 100,
-      createdAt: new Date().toISOString()
-    };
-    setEvents(prev => [newEvent, ...prev]);
-    return newEvent;
+  const addEvent = async (eventData) => {
+    try {
+      const created = await api.events.create(eventData);
+      setEvents(prev => [created, ...prev.filter(e => e.id !== created.id)]);
+      return created;
+    } catch (err) {
+      const newEvent = {
+        ...eventData,
+        id: 'evt_' + Date.now().toString(36),
+        evaluationOpen: eventData.evaluationOpen !== undefined ? eventData.evaluationOpen : true,
+        status: eventData.status || (eventData.evaluationOpen ? 'ACTIVE' : 'UPCOMING'),
+        expectedAttendees: Number(eventData.expectedAttendees) || 100,
+        createdAt: new Date().toISOString()
+      };
+      setEvents(prev => [newEvent, ...prev]);
+      return newEvent;
+    }
   };
 
   // UPDATE: Update existing event
-  const updateEvent = (eventId, updatedFields) => {
+  const updateEvent = async (eventId, updatedFields) => {
     setEvents(prev => prev.map(e => {
       if (e.id === eventId) {
         const merged = { ...e, ...updatedFields };
@@ -211,19 +182,31 @@ export const EvaluationProvider = ({ children }) => {
       }
       return e;
     }));
+
+    try {
+      const updated = await api.events.update(eventId, updatedFields);
+      setEvents(prev => prev.map(e => (e.id === eventId ? updated : e)));
+      return updated;
+    } catch (err) {
+      console.warn('API update event notice:', err.message);
+    }
   };
 
-  // DELETE: Delete an event and cleanly handle associated responses
-  const deleteEvent = (eventId) => {
+  // DELETE: Delete an event
+  const deleteEvent = async (eventId) => {
     setEvents(prev => prev.filter(e => e.id !== eventId));
-    // Cascade delete associated responses
     setResponses(prev => prev.filter(r => r.eventId !== eventId));
-    // Cascade cleanup for action plans
     setActionPlans(prev => prev.filter(p => p.eventId !== eventId));
+
+    try {
+      await api.events.delete(eventId);
+    } catch (err) {
+      console.warn('API delete event notice:', err.message);
+    }
   };
 
   // Toggle evaluation open/close status
-  const toggleEventEvaluation = (eventId) => {
+  const toggleEventEvaluation = async (eventId) => {
     setEvents(prev =>
       prev.map(e => {
         if (e.id === eventId) {
@@ -237,65 +220,116 @@ export const EvaluationProvider = ({ children }) => {
         return e;
       })
     );
+
+    try {
+      const updated = await api.events.toggle(eventId);
+      setEvents(prev => prev.map(e => (e.id === eventId ? updated : e)));
+    } catch (err) {
+      console.warn('API toggle event notice:', err.message);
+    }
   };
 
   // ==========================================
   // ORGANIZATIONS CRUD
   // ==========================================
 
-  // CREATE: Add organization
-  const addOrganization = (orgData) => {
-    const newOrg = {
-      ...orgData,
-      id: 'org_' + Date.now().toString(36),
-      status: 'ACTIVE',
-      eccKeyStatus: 'ACTIVE',
-      eccKeyId: 'ecc_' + (orgData.shortCode?.toLowerCase() || 'rso') + '_' + Date.now().toString(36)
-    };
-    setOrganizations(prev => [...prev, newOrg]);
-    return newOrg;
+  const addOrganization = async (orgData) => {
+    try {
+      const created = await api.organizations.create(orgData);
+      setOrganizations(prev => [...prev.filter(o => o.id !== created.id), created]);
+      return created;
+    } catch (err) {
+      const newOrg = {
+        ...orgData,
+        id: 'org_' + Date.now().toString(36),
+        status: 'ACTIVE',
+        eccKeyStatus: 'ACTIVE',
+        eccKeyId: 'ecc_' + (orgData.shortCode?.toLowerCase() || 'rso') + '_' + Date.now().toString(36)
+      };
+      setOrganizations(prev => [...prev, newOrg]);
+      return newOrg;
+    }
   };
 
-  // UPDATE: Update organization (Name, shortCode, President, Adviser, etc.)
-  const updateOrganization = (orgId, updatedFields) => {
+  const updateOrganization = async (orgId, updatedFields) => {
     setOrganizations(prev => prev.map(o => (o.id === orgId ? { ...o, ...updatedFields } : o)));
+    try {
+      const updated = await api.organizations.update(orgId, updatedFields);
+      setOrganizations(prev => prev.map(o => (o.id === orgId ? updated : o)));
+      return updated;
+    } catch (err) {
+      console.warn('API update organization notice:', err.message);
+    }
   };
 
-  // DELETE: Delete organization
-  const deleteOrganization = (orgId) => {
+  const deleteOrganization = async (orgId) => {
     setOrganizations(prev => prev.filter(o => o.id !== orgId));
     setEvents(prev => prev.filter(e => e.organizationId !== orgId));
+    try {
+      await api.organizations.delete(orgId);
+    } catch (err) {
+      console.warn('API delete organization notice:', err.message);
+    }
   };
 
   // ==========================================
   // ACTION PLANS CRUD
   // ==========================================
 
-  // CREATE: Add action plan
-  const addActionPlan = (planData) => {
-    const newPlan = {
-      ...planData,
-      id: 'act_' + Date.now().toString(36),
-      status: planData.status || 'IN_PROGRESS',
-      createdAt: new Date().toISOString()
-    };
-    setActionPlans(prev => [newPlan, ...prev]);
-    return newPlan;
+  const addActionPlan = async (planData) => {
+    try {
+      const created = await api.actionPlans.create(planData);
+      setActionPlans(prev => [created, ...prev.filter(p => p.id !== created.id)]);
+      return created;
+    } catch (err) {
+      const newPlan = {
+        ...planData,
+        id: 'act_' + Date.now().toString(36),
+        status: planData.status || 'IN_PROGRESS',
+        createdAt: new Date().toISOString()
+      };
+      setActionPlans(prev => [newPlan, ...prev]);
+      return newPlan;
+    }
   };
 
-  // UPDATE: Update action plan
-  const updateActionPlan = (planId, updatedFields) => {
+  const updateActionPlan = async (planId, updatedFields) => {
     setActionPlans(prev => prev.map(p => (p.id === planId ? { ...p, ...updatedFields } : p)));
+    try {
+      const updated = await api.actionPlans.update(planId, updatedFields);
+      setActionPlans(prev => prev.map(p => (p.id === planId ? updated : p)));
+      return updated;
+    } catch (err) {
+      console.warn('API update action plan notice:', err.message);
+    }
   };
 
-  // UPDATE STATUS: Quick status update
-  const updateActionPlanStatus = (planId, status) => {
+  const updateActionPlanStatus = async (planId, status) => {
     setActionPlans(prev => prev.map(p => (p.id === planId ? { ...p, status } : p)));
+    try {
+      const updated = await api.actionPlans.updateStatus(planId, status);
+      setActionPlans(prev => prev.map(p => (p.id === planId ? updated : p)));
+      return updated;
+    } catch (err) {
+      console.warn('API update action plan status notice:', err.message);
+    }
   };
 
-  // DELETE: Delete action plan
-  const deleteActionPlan = (planId) => {
+  const deleteActionPlan = async (planId) => {
     setActionPlans(prev => prev.filter(p => p.id !== planId));
+    try {
+      await api.actionPlans.delete(planId);
+    } catch (err) {
+      console.warn('API delete action plan notice:', err.message);
+    }
+  };
+
+  const resetToDefaultData = () => {
+    setOrganizations(MOCK_ORGANIZATIONS);
+    setEvents(MOCK_EVENTS);
+    setResponses(MOCK_RESPONSES);
+    setActionPlans(MOCK_ACTION_PLANS);
+    setFormTemplates(MOCK_FORM_TEMPLATES);
   };
 
   return (
@@ -309,6 +343,8 @@ export const EvaluationProvider = ({ children }) => {
         selectedEventId,
         setSelectedEventId,
         hasStudentEvaluated,
+        refreshData,
+        isLoadingData,
         // Evaluations CRUD
         submitEvaluation,
         updateEvaluation,

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CryptoProvider } from './context/CryptoContext';
 import { EvaluationProvider, useEvaluation } from './context/EvaluationContext';
 import Navbar from './components/common/Navbar';
+import LoginView from './components/auth/LoginView';
 
 // Student Components
 import StudentEventsView from './components/student/StudentEventsView';
@@ -25,31 +26,73 @@ import AdminGovernance from './components/admin/AdminGovernance';
 import EccPlayground from './components/crypto/EccPlayground';
 
 function AppContent() {
-  const { currentUser, isStudent, isRSO, isUACSC, isAdmin } = useAuth();
+  const { currentUser, isLoadingAuth, isStudent, isRSO, isUACSC, isAdmin } = useAuth();
   const { events } = useEvaluation();
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState(() => {
-    if (isStudent) return 'student_events';
-    if (isRSO) return 'rso_dashboard';
-    if (isUACSC) return 'uacsc_overview';
-    if (isAdmin) return 'admin_governance';
-    return 'rso_dashboard';
-  });
-  
-  // Track role changes to synchronize default tabs
-  const [prevRole, setPrevRole] = useState(currentUser?.role);
-  if (currentUser?.role !== prevRole) {
-    setPrevRole(currentUser?.role);
-    if (isStudent) setActiveTab('student_events');
-    else if (isRSO) setActiveTab('rso_dashboard');
-    else if (isUACSC) setActiveTab('uacsc_overview');
-    else if (isAdmin) setActiveTab('admin_governance');
-  }
+  const [activeTab, setActiveTab] = useState('rso_dashboard');
+
+  // Automatically synchronize active tab and dashboard whenever currentUser changes
+  useEffect(() => {
+    if (!currentUser) return;
+    const role = currentUser.role;
+    if (role === 'ADMIN') {
+      setActiveTab('admin_governance');
+    } else if (role === 'UACSC_OFFICER') {
+      setActiveTab('uacsc_overview');
+    } else if (role === 'RSO_OFFICER') {
+      setActiveTab('rso_dashboard');
+    } else if (role === 'STUDENT') {
+      setActiveTab('student_events');
+    }
+  }, [currentUser]);
 
   // Active Event for evaluation
-  const [targetEvent, setTargetEvent] = useState(events[0]);
+  const [targetEvent, setTargetEvent] = useState(null);
   const [editingResponse, setEditingResponse] = useState(null);
+
+  // Default target event
+  useEffect(() => {
+    if (events && events.length > 0 && !targetEvent) {
+      if (currentUser?.organizationId) {
+        const orgEvt = events.find(e => e.organizationId === currentUser.organizationId);
+        setTargetEvent(orgEvt || events[0]);
+      } else {
+        setTargetEvent(events[0]);
+      }
+    }
+  }, [events, currentUser, targetEvent]);
+
+  // Loading screen while verifying token
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white space-y-4">
+        <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+        <p className="text-sm font-semibold tracking-wider text-slate-300">
+          Loading University of the Assumption Evaluation System...
+        </p>
+      </div>
+    );
+  }
+
+  // If not logged in, enforce Login View first!
+  if (!currentUser) {
+    return (
+      <LoginView
+        onLoginSuccess={(user) => {
+          if (user.role === 'ADMIN') {
+            setActiveTab('admin_governance');
+          } else if (user.role === 'UACSC_OFFICER') {
+            setActiveTab('uacsc_overview');
+          } else if (user.role === 'RSO_OFFICER') {
+            setActiveTab('rso_dashboard');
+          } else if (user.role === 'STUDENT') {
+            setActiveTab('student_events');
+          }
+        }}
+      />
+    );
+  }
 
   const handleStartEvaluation = (event) => {
     setTargetEvent(event);
@@ -113,7 +156,7 @@ function AppContent() {
           </>
         )}
 
-        {/* RSO OFFICER VIEWS */}
+        {/* RSO OFFICER VIEWS (Locked to their authorized organization) */}
         {isRSO && (
           <>
             {activeTab === 'rso_dashboard' && (
@@ -157,7 +200,7 @@ function AppContent() {
           </>
         )}
 
-        {/* UNIVERSITY ADMIN VIEWS */}
+        {/* UNIVERSITY ADMIN VIEWS (OSA Director oversees OSA, UACSC, and all RSOs) */}
         {isAdmin && (
           <>
             <AdminGovernance
@@ -190,7 +233,7 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-              Zero-Modals • Native NIST P-256 ECC
+              Zero-Modals • Native NIST P-256 ECC • Prisma ORM SQLite Backend
             </span>
             <span>Accredited by Office of Student Affairs & Services</span>
           </div>

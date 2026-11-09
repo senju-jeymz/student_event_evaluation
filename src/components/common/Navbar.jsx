@@ -6,11 +6,12 @@ import { UNIVERSITY_CONFIG } from '../../config/organizationConfig';
 import { 
   UserCheck, 
   Lock,
-  Building2
+  Building2,
+  LogOut
 } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
-  const { currentUser, switchUser, switchRsoOrganization, allUsers, isAdmin, isUACSC, isRSO, isStudent } = useAuth();
+  const { currentUser, logout, switchUser, switchRsoOrganization, allUsers, isAdmin, isUACSC, isRSO, isStudent } = useAuth();
   const { organizations } = useEvaluation();
 
   const currentOrg = organizations.find(o => o.id === currentUser?.organizationId) || organizations[0];
@@ -18,15 +19,19 @@ export default function Navbar({ activeTab, setActiveTab }) {
   const getRoleBadge = (role) => {
     switch (role) {
       case ROLES.ADMIN:
+      case 'ADMIN':
         return { label: 'University Admin (OSA)', bg: 'bg-rose-100 text-rose-800 border-rose-200' };
       case ROLES.UACSC:
+      case 'UACSC_OFFICER':
         return { label: 'UACSC President', bg: 'bg-amber-100 text-amber-800 border-amber-200' };
       case ROLES.RSO:
+      case 'RSO_OFFICER':
         return { 
           label: `${currentOrg?.shortCode || 'RSO'} President`, 
           bg: currentOrg?.palette?.badge || 'bg-slate-100 text-slate-800 border-slate-300' 
         };
       case ROLES.STUDENT:
+      case 'STUDENT':
         return { label: 'Student Participant', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
       default:
         return { label: 'User', bg: 'bg-slate-100 text-slate-800' };
@@ -52,65 +57,71 @@ export default function Navbar({ activeTab, setActiveTab }) {
           </div>
 
           <div className="hidden md:flex items-center gap-1.5 pl-3 border-l border-slate-700">
+            <span className="text-slate-400 text-[11px]">Backend:</span>
+            <span className="text-emerald-400 font-mono text-[11px] font-semibold">Prisma + SQLite (Port 5000)</span>
           </div>
         </div>
 
         {/* Quick Role & Identity Switcher */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* If RSO Officer, allow choosing from all 18 organizations */}
-          {isRSO && (
+          {/* If OSA Admin, allow supervising and switching across all organizations */}
+          {isAdmin && (
             <div className="flex items-center gap-1.5 mr-2">
               <Building2 className="w-3.5 h-3.5 text-amber-400" />
+              <label htmlFor="admin-org-inspect" className="text-slate-400 text-[11px]">Inspect RSO:</label>
               <select
-                aria-label="Select RSO Organization"
+                id="admin-org-inspect"
+                aria-label="Inspect RSO Organization"
                 value={currentUser?.organizationId || ''}
                 onChange={(e) => switchRsoOrganization(e.target.value)}
                 className="bg-slate-800 text-amber-300 text-xs font-bold rounded-lg px-2 py-1 border border-amber-500/40 focus:outline-none cursor-pointer"
               >
+                <option value="">All Organizations (OSA Overview)</option>
                 {organizations
-                .filter(org => org.shortCode !== 'UACSC')
-                .map(org => (
-                  <option key={org.id} value={org.id}>
-                    {org.shortCode} — {org.name}
-                  </option>
-                ))}
+                  .filter(org => org.shortCode !== 'UACSC')
+                  .map(org => (
+                    <option key={org.id} value={org.id}>
+                      {org.shortCode} — {org.name}
+                    </option>
+                  ))}
               </select>
             </div>
           )}
 
+          {/* User profile dropdown switcher */}
           <label htmlFor="user-select" className="text-slate-400 text-xs font-medium flex items-center gap-1">
             <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
-            Switch User:
+            Switch Profile:
           </label>
           <select
             id="user-select"
-            value={currentUser?.id}
+            value={currentUser?.id || ''}
             onChange={(e) => switchUser(e.target.value)}
             className="bg-slate-800 text-slate-100 text-xs font-medium rounded-lg px-2.5 py-1 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
           >
             <optgroup label="Office of Student Affairs (OSA)">
-              {allUsers.filter(u => u.role === ROLES.ADMIN).map(u => (
+              {allUsers.filter(u => u.role === ROLES.ADMIN || u.role === 'ADMIN').map(u => (
                 <option key={u.id} value={u.id}>
                   {u.name} — OSA Director
                 </option>
               ))}
             </optgroup>
             <optgroup label="Central Student Council (UACSC)">
-              {allUsers.filter(u => u.role === ROLES.UACSC).map(u => (
+              {allUsers.filter(u => u.role === ROLES.UACSC || u.role === 'UACSC_OFFICER').map(u => (
                 <option key={u.id} value={u.id}>
                   {u.name} — UACSC President
                 </option>
               ))}
             </optgroup>
-            <optgroup label="RSO Leaders">
-              {allUsers.filter(u => u.role === ROLES.RSO).map(u => (
+            <optgroup label="RSO Leaders (18 Orgs)">
+              {allUsers.filter(u => u.role === ROLES.RSO || u.role === 'RSO_OFFICER').map(u => (
                 <option key={u.id} value={u.id}>
                   {u.name} — {u.title}
                 </option>
               ))}
             </optgroup>
             <optgroup label="Student Participants">
-              {allUsers.filter(u => u.role === ROLES.STUDENT).map(u => (
+              {allUsers.filter(u => u.role === ROLES.STUDENT || u.role === 'STUDENT').map(u => (
                 <option key={u.id} value={u.id}>
                   {u.name} ({u.studentId})
                 </option>
@@ -129,30 +140,25 @@ export default function Navbar({ activeTab, setActiveTab }) {
               UA
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-slate-900 tracking-tight text-base sm:text-lg">
-                  StudEval
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  NIST ECC
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 hidden sm:block">
-                UA Student Organization Event Evaluation System
-              </p>
+              <span className="font-extrabold text-slate-900 tracking-tight text-sm sm:text-base block">
+                {isRSO ? `${currentOrg?.name || 'RSO'} Portal` : isUACSC ? 'UACSC Student Council' : isAdmin ? 'OSA University Governance' : 'StudEval Portal'}
+              </span>
+              <span className="text-[10px] sm:text-xs text-slate-500 font-medium block">
+                {isRSO ? `${currentOrg?.shortCode} • ${currentOrg?.college || 'Student Organization'}` : 'University Event Evaluation System'}
+              </span>
             </div>
           </div>
 
-          {/* Navigation Links according to Role */}
-          <nav className="flex items-center gap-1 sm:gap-2">
+          {/* Navigation Links according to role */}
+          <nav className="hidden md:flex items-center gap-1 bg-slate-100/70 p-1 rounded-xl border border-slate-200/60">
             {isStudent && (
               <>
                 <button
                   onClick={() => setActiveTab('student_events')}
                   className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                     activeTab === 'student_events' || activeTab === 'student_eval_form'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      ? 'bg-white text-indigo-600 shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-200/50'
                   }`}
                 >
                   Campus Events
@@ -161,18 +167,18 @@ export default function Navbar({ activeTab, setActiveTab }) {
                   onClick={() => setActiveTab('student_my_slips')}
                   className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                     activeTab === 'student_my_slips'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      ? 'bg-white text-indigo-600 shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-200/50'
                   }`}
                 >
-                  My Evaluation Receipts
+                  My Slips & Certificates
                 </button>
                 <button
                   onClick={() => setActiveTab('crypto_inspector')}
                   className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                     activeTab === 'crypto_inspector'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      ? 'bg-white text-indigo-600 shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-200/50'
                   }`}
                 >
                   ECC Playground
@@ -190,7 +196,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  RSO Dashboard
+                  {currentOrg?.shortCode} Dashboard
                 </button>
                 <button
                   onClick={() => setActiveTab('rso_evaluations')}
@@ -200,7 +206,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Responses & Decrypt
+                  Responses & Decryption
                 </button>
                 <button
                   onClick={() => setActiveTab('rso_action_plans')}
@@ -214,14 +220,13 @@ export default function Navbar({ activeTab, setActiveTab }) {
                 </button>
                 <button
                   onClick={() => setActiveTab('rso_key_vault')}
-                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                     activeTab === 'rso_key_vault'
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  <Lock className="w-3.5 h-3.5" />
-                  ECC Vault
+                  Key Vault
                 </button>
               </>
             )}
@@ -236,7 +241,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  Council Overview
+                  UACSC Overview
                 </button>
                 <button
                   onClick={() => setActiveTab('uacsc_rankings')}
@@ -246,7 +251,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  RSO Rankings
+                  18 RSOs Standings
                 </button>
                 <button
                   onClick={() => setActiveTab('uacsc_calendar')}
@@ -307,9 +312,9 @@ export default function Navbar({ activeTab, setActiveTab }) {
             )}
           </nav>
 
-          {/* Current User Badge */}
+          {/* Current User Badge & Logout */}
           <div className="flex items-center gap-3">
-            <div className="hidden md:flex flex-col items-end text-right">
+            <div className="hidden sm:flex flex-col items-end text-right">
               <span className="text-xs font-bold text-slate-800">{currentUser?.name}</span>
               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border mt-0.5 ${badge.bg}`}>
                 {badge.label}
@@ -318,6 +323,15 @@ export default function Navbar({ activeTab, setActiveTab }) {
             <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-lg shadow-xs">
               {currentUser?.avatar || '👤'}
             </div>
+
+            <button
+              onClick={logout}
+              title="Sign Out"
+              className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200/70 transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         </div>
       </div>

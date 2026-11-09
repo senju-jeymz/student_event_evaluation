@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../services/api';
 import {
   generateEccKeyPair,
   encryptFeedbackWithEcc,
@@ -15,33 +16,38 @@ const CryptoContext = createContext();
 
 export const CryptoProvider = ({ children }) => {
   // Audit logs store
-  const [auditLogs, setAuditLogs] = useState(() => {
-    const saved = localStorage.getItem('system_audit_logs');
-    return saved ? JSON.parse(saved) : MOCK_AUDIT_LOGS;
-  });
+  const [auditLogs, setAuditLogs] = useState(MOCK_AUDIT_LOGS);
 
-  // Session-protected private keys (in-memory ONLY for security, never written plain to localStorage)
+  // Session-protected private keys (in-memory ONLY for security, never written plain to disk)
   // Maps orgId -> privateKeyJwk
   const [unlockedPrivateKeys, setUnlockedPrivateKeys] = useState({});
 
-  // Passphrase-encrypted private key vaults (stored in localStorage with PBKDF2 + AES-GCM)
-  const [vaultRecords, setVaultRecords] = useState(() => {
-    const saved = localStorage.getItem('ecc_key_vaults');
-    return saved ? JSON.parse(saved) : {};
-  });
+  // Passphrase-encrypted private key vaults
+  const [vaultRecords, setVaultRecords] = useState({});
 
-  // Save audit logs to localStorage
+  // Load live vaults and audit logs from backend API
   useEffect(() => {
-    localStorage.setItem('system_audit_logs', JSON.stringify(auditLogs));
-  }, [auditLogs]);
-
-  // Save vault records to localStorage
-  useEffect(() => {
-    localStorage.setItem('ecc_key_vaults', JSON.stringify(vaultRecords));
-  }, [vaultRecords]);
+    async function loadBackendCrypto() {
+      try {
+        const [vaults, logs] = await Promise.allSettled([
+          api.crypto.getVaults(),
+          api.crypto.getAuditLogs()
+        ]);
+        if (vaults.status === 'fulfilled' && vaults.value && typeof vaults.value === 'object') {
+          setVaultRecords(vaults.value);
+        }
+        if (logs.status === 'fulfilled' && Array.isArray(logs.value) && logs.value.length > 0) {
+          setAuditLogs(logs.value);
+        }
+      } catch (err) {
+        console.warn('Backend crypto sync notice:', err.message);
+      }
+    }
+    loadBackendCrypto();
+  }, []);
 
   // Log an audit trail entry
-  const addAuditLog = (action, details, actorName, actorRole, organizationId, severity = 'INFO') => {
+  const addAuditLog = async (action, details, actorName, actorRole, organizationId, severity = 'INFO') => {
     const entry = {
       id: 'aud_' + Date.now().toString(36),
       action,
@@ -53,6 +59,12 @@ export const CryptoProvider = ({ children }) => {
       timestamp: new Date().toISOString()
     };
     setAuditLogs(prev => [entry, ...prev]);
+
+    try {
+      await api.crypto.addAuditLog(entry);
+    } catch (err) {
+      console.warn('API add audit log notice:', err.message);
+    }
     return entry;
   };
 
@@ -66,16 +78,18 @@ export const CryptoProvider = ({ children }) => {
     // Protect private key with passphrase using PBKDF2 + AES-GCM
     const encryptedVault = await protectPrivateKeyWithPassphrase(keyData.privateKeyJwk, passphrase);
 
-    // Save in vault storage
+    const vaultPayload = {
+      keyId: keyData.keyId,
+      publicKeyJwk: keyData.publicKeyJwk,
+      encryptedVault,
+      updatedAt: new Date().toISOString(),
+      algorithm: keyData.algorithm
+    };
+
+    // Save in local state
     setVaultRecords(prev => ({
       ...prev,
-      [orgId]: {
-        keyId: keyData.keyId,
-        publicKeyJwk: keyData.publicKeyJwk,
-        encryptedVault,
-        updatedAt: new Date().toISOString(),
-        algorithm: keyData.algorithm
-      }
+      [orgId]: vaultPayload
     }));
 
     // Unlock in active session memory
@@ -83,6 +97,13 @@ export const CryptoProvider = ({ children }) => {
       ...prev,
       [orgId]: keyData.privateKeyJwk
     }));
+
+    // Save to backend database
+    try {
+      await api.crypto.saveVault(orgId, vaultPayload);
+    } catch (err) {
+      console.warn('Backend vault save notice:', err.message);
+    }
 
     addAuditLog(
       'ECC_KEY_PAIR_GENERATED',
@@ -100,7 +121,17 @@ export const CryptoProvider = ({ children }) => {
    * Unlock an organization's private key into session memory using passphrase
    */
   const unlockOrgPrivateKey = async (orgId, passphrase, actorName) => {
-    const vault = vaultRecords[orgId];
+    let vault = vaultRecords[orgId];
+    if (!vault || !vault.encryptedVault) {
+      // Try fetching from backend
+      try {
+        vault = await api.crypto.getVault(orgId);
+        setVaultRecords(prev => ({ ...prev, [orgId]: vault }));
+      } catch (e) {
+        // Not found
+      }
+    }
+
     if (!vault || !vault.encryptedVault) {
       throw new Error(`No encrypted key vault found for organization: ${orgId}`);
     }

@@ -1,0 +1,130 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id             String   @id
+  username       String   @unique
+  email          String   @unique
+  password       String
+  name           String
+  role           String   // ADMIN, UACSC_OFFICER, RSO_OFFICER, STUDENT
+  organizationId String?
+  avatar         String?
+  title          String?
+  adviser        String?
+  studentId      String?
+  department     String?
+  yearLevel      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Organization {
+  id           String   @id
+  name         String
+  shortCode    String   @unique
+  category     String
+  college      String
+  president    String
+  adviser      String?
+  paletteKey   String   @default("GRAY")
+  palette      String   // JSON string
+  color        String?
+  status       String   @default("ACTIVE")
+  eccKeyStatus String   @default("ACTIVE")
+  eccKeyId     String?
+  publicKeyJwk String?  // JSON string
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Event {
+  id                    String   @id
+  organizationId        String
+  title                 String
+  category              String
+  date                  String
+  time                  String
+  venue                 String
+  modality              String   // In-Person, Online, Hybrid
+  speakers              String   // JSON string array
+  tags                  String   // JSON string array
+  description           String?
+  expectedAttendees     Int      @default(100)
+  evaluationOpen        Boolean  @default(true)
+  eccEncryptionRequired Boolean  @default(true)
+  status                String   @default("ACTIVE")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Evaluation {
+  id               String    @id
+  eventId          String
+  organizationId   String
+  studentId        String?
+  fullName         String?
+  department       String?
+  yearLevel        String?
+  modality         String?
+  isAnonymous      Boolean   @default(false)
+  ratings          String    // JSON string
+  isEncrypted      Boolean   @default(false)
+  comments         String?   // JSON string or plaintext placeholder
+  encryptedBundle  String?   // JSON string { ephemeralPublicKeyJwk, iv, ciphertext }
+  decryptedSample  String?   // JSON string demo fallback
+  verificationCode String
+  signature        String
+  actionPlanStatus String    @default("IN_REVIEW")
+  officerRemarks   String?
+  submittedAt      DateTime  @default(now())
+  lastUpdatedAt    DateTime?
+}
+
+model ActionPlan {
+  id             String   @id
+  organizationId String
+  eventId        String?
+  title          String
+  originFeedback String?
+  assignedTo     String?
+  dueDate        String?
+  status         String   @default("IN_PROGRESS") // IN_PROGRESS, UNDER_REVIEW, RESOLVED
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model EccVault {
+  organizationId String   @id
+  keyId          String
+  publicKeyJwk   String   // JSON string
+  encryptedVault String   // JSON string
+  algorithm      String   @default("ECDH-P256-AES-GCM-256")
+  updatedAt      DateTime @updatedAt
+}
+
+model AuditLog {
+  id             String   @id
+  action         String
+  severity       String   @default("INFO")
+  actor          String
+  actorRole      String
+  organizationId String
+  details        String
+  timestamp      DateTime @default(now())
+}
+
+model FormTemplate {
+  id        String   @id
+  name      String
+  category  String
+  sections  String   // JSON string
+  updatedAt DateTime @updatedAt
+}
+

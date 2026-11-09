@@ -3,7 +3,7 @@
  * Fully synchronized with University of the Assumption & OSA structure
  */
 
-import { INITIAL_ORGANIZATIONS, INITIAL_EVENTS, UNIVERSITY_CONFIG, COLOR_PALETTES } from '../config/organizationConfig';
+import { INITIAL_ORGANIZATIONS, INITIAL_EVENTS, UNIVERSITY_CONFIG, COLOR_PALETTES } from '../config/organizationConfig.js';
 
 export const ROLES = {
   ADMIN: 'ADMIN',             // University Admin (Office of Student Affairs - OSA)
